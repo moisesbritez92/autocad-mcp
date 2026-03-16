@@ -1,0 +1,4 @@
+(load "C:/Users/moise/Documents/010_MCP/scripts/test_load.lsp")
+(c:TestLoad)
+._QUIT
+Y

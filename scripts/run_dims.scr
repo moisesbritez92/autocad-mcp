@@ -1,0 +1,2 @@
+(load "C:/Users/moise/Documents/010_MCP/scripts/add_dimensions.lsp")
+(c:AddDims)

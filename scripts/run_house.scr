@@ -1,0 +1,4 @@
+(setvar "SECURELOAD" 0)
+(load "C:/Users/moise/Documents/010_MCP/scripts/make_house.lsp")
+(c:MakeHouse)
+._QSAVE

@@ -1,0 +1,3 @@
+(load "C:/Users/moise/Documents/010_MCP/scripts/add_wall_dims.lsp")
+(c:AddWallDims)
+._QSAVE
