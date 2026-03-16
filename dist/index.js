@@ -6,13 +6,92 @@ import { promisify } from "util";
 import path from "path";
 import fs from "fs/promises";
 import dotenv from "dotenv";
+import { Buffer } from "buffer";
+import { sendAutoCADCommand } from "./autocadClient.js";
 // Load environment variables
 dotenv.config();
 // Configuration
 // Try to find AutoCAD Core Console or use environment variable
-const AUTOCAD_CONSOLE_PATH = process.env.AUTOCAD_CONSOLE_PATH || "C:\\Program Files\\Autodesk\\AutoCAD 2024\\accoreconsole.exe";
+const AUTOCAD_CONSOLE_PATH = process.env.AUTOCAD_CONSOLE_PATH || "C:\\Program Files\\Autodesk\\AutoCAD 2026\\accoreconsole.exe";
 const SCRIPTS_DIR = process.env.AUTOCAD_SCRIPTS_DIR || path.join(process.cwd(), "scripts");
 const execAsync = promisify(exec);
+function decodeAutoCADOutput(output) {
+    if (output == null)
+        return "";
+    if (Buffer.isBuffer(output)) {
+        const utf16 = output.toString("utf16le").replace(/\u0000/g, "").trim();
+        if (utf16)
+            return utf16;
+        return output.toString("utf8").replace(/\u0000/g, "").trim();
+    }
+    if (typeof output === "string") {
+        if (output.includes("\u0000") || output.includes("\0")) {
+            return output.replace(/\u0000|\0/g, "").trim();
+        }
+        return output.trim();
+    }
+    return String(output).trim();
+}
+function cleanAutoCADOutput(output) {
+    if (!output)
+        return "";
+    const noisePatterns = [
+        /^Redirect stdout /i,
+        /^AcCoreConsole: /i,
+        /^AutoCAD Core Engine Console /i,
+        /^Execution Path:/i,
+        /^[A-Z]:\\Program Files\\Autodesk\\.*accoreconsole\.exe$/i,
+        /^Current Directory:/i,
+        /^Version Number:/i,
+        /^LogFilePath has been set to the working folder\.?$/i,
+        /^LogFilePath has been restored to .*$/i,
+        /^CoreHeartBeat$/i,
+        /^Regenerating model\.?$/i,
+        /^Loading Modeler DLLs\.?$/i,
+        /^\*\*\*\* System Variable Changed \*\*\*\*$/i,
+        /^1 of the monitored system variables has changed from the preferred value\..*$/i,
+        /^AutoCAD menu utilities loaded\.?$/i,
+        /^Command:$/i
+    ];
+    const cleanedLines = output
+        .split(/\r?\n/)
+        .map(line => line.trimEnd())
+        .filter(line => line.trim() !== "")
+        .filter(line => !noisePatterns.some(pattern => pattern.test(line)));
+    return cleanedLines.join("\n").trim();
+}
+function summarizeExecution(stdout, stderr, hadError = false) {
+    const combined = `${stdout}\n${stderr}`.trim();
+    const lines = combined.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const successHints = [
+        /loaded successfully!?/i,
+        /completed successfully/i,
+        /success/i
+    ];
+    const failureHints = [
+        /error/i,
+        /exception/i,
+        /invalid/i,
+        /failed/i,
+        /fatal/i,
+        /not found/i
+    ];
+    const successLine = lines.find(line => successHints.some(pattern => pattern.test(line)));
+    const failureLine = lines.find(line => failureHints.some(pattern => pattern.test(line)));
+    if (hadError || failureLine) {
+        return `Summary: FAILED${failureLine ? ` — ${failureLine}` : ""}`;
+    }
+    if (successLine) {
+        return `Summary: OK — ${successLine}`;
+    }
+    if (stdout && !stderr) {
+        return "Summary: OK — command completed with output";
+    }
+    if (!stdout && !stderr) {
+        return "Summary: OK — no output";
+    }
+    return "Summary: OK — command completed";
+}
 const server = new Server({
     name: "autocad-mcp-server",
     version: "1.0.0",
@@ -91,8 +170,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
         tools: [
             {
-                name: "execute_script",
-                description: "Executes an AutoCAD script (.scr) against a drawing (.dwg) using accoreconsole.",
+                name: "execute_script_file",
+                description: "Executes an AutoCAD script (.scr) against a drawing (.dwg) using accoreconsole (headless). Best for batch processing.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -119,6 +198,39 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     type: "object",
                     properties: {}
                 }
+            },
+            {
+                name: "create_line",
+                description: "Creates a line in the active AutoCAD document (requires running Plugin).",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        startX: { type: "number", description: "Start X coordinate" },
+                        startY: { type: "number", description: "Start Y coordinate" },
+                        endX: { type: "number", description: "End X coordinate" },
+                        endY: { type: "number", description: "End Y coordinate" }
+                    },
+                    required: ["startX", "startY", "endX", "endY"]
+                }
+            },
+            {
+                name: "get_layers",
+                description: "Gets a list of all layers in the active AutoCAD document.",
+                inputSchema: {
+                    type: "object",
+                    properties: {}
+                }
+            },
+            {
+                name: "create_layer",
+                description: "Creates a new layer in the active AutoCAD document.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        name: { type: "string", description: "Name of the new layer" }
+                    },
+                    required: ["name"]
+                }
             }
         ]
     };
@@ -134,7 +246,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 }]
         };
     }
-    if (request.params.name === "execute_script") {
+    if (request.params.name === "execute_script_file") {
         const drawingPath = String(request.params.arguments?.drawingPath);
         const scriptPath = String(request.params.arguments?.scriptPath);
         const timeoutSec = Number(request.params.arguments?.timeout) || 60;
@@ -154,27 +266,58 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const command = `"${AUTOCAD_CONSOLE_PATH}" /i "${drawingPath}" /s "${scriptPath}"`;
         console.error(`Executing: ${command}`);
         try {
-            const { stdout, stderr } = await execAsync(command, { timeout: timeoutSec * 1000 });
+            const { stdout, stderr } = await execAsync(command, {
+                timeout: timeoutSec * 1000,
+                encoding: "buffer",
+                maxBuffer: 20 * 1024 * 1024
+            });
+            const cleanStdout = cleanAutoCADOutput(decodeAutoCADOutput(stdout));
+            const cleanStderr = cleanAutoCADOutput(decodeAutoCADOutput(stderr));
+            const summary = summarizeExecution(cleanStdout, cleanStderr, false);
             return {
                 content: [
                     {
                         type: "text",
-                        text: `Execution Completed.\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`
+                        text: `Execution Completed.\n${summary}\n\nSTDOUT:\n${cleanStdout || "(no output)"}\n\nSTDERR:\n${cleanStderr || "(no output)"}`
                     }
                 ]
             };
         }
         catch (error) {
+            const cleanStdout = cleanAutoCADOutput(decodeAutoCADOutput(error.stdout));
+            const cleanStderr = cleanAutoCADOutput(decodeAutoCADOutput(error.stderr));
+            const summary = summarizeExecution(cleanStdout, cleanStderr, true);
             return {
                 content: [
                     {
                         type: "text",
-                        text: `Error executing script: ${error.message}\n\nSTDOUT:\n${error.stdout || ''}\n\nSTDERR:\n${error.stderr || ''}`
+                        text: `Error executing script: ${error.message}\n${summary}\n\nSTDOUT:\n${cleanStdout || "(no output)"}\n\nSTDERR:\n${cleanStderr || "(no output)"}`
                     }
                 ],
                 isError: true
             };
         }
+    }
+    // New Tools that talk to the Plugin
+    if (request.params.name === "create_line") {
+        const args = request.params.arguments;
+        const result = await sendAutoCADCommand("create_line", args);
+        return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+    }
+    if (request.params.name === "get_layers") {
+        const result = await sendAutoCADCommand("get_layers");
+        return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+    }
+    if (request.params.name === "create_layer") {
+        const args = request.params.arguments;
+        const result = await sendAutoCADCommand("create_layer", args);
+        return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
     }
     throw new McpError(ErrorCode.MethodNotFound, `Tool not found: ${request.params.name}`);
 });

@@ -1,0 +1,77 @@
+(vl-load-com)
+
+(defun oc:str-up (s)
+  (strcase (vl-princ-to-string (if s s "")))
+)
+
+(defun oc:block-category (name / u)
+  (setq u (oc:str-up name))
+  (cond
+    ((or (wcmatch u "*PUERTA*") (wcmatch u "*DOOR*")) "doors")
+    ((or (wcmatch u "*VENTANA*") (wcmatch u "*WINDOW*") (wcmatch u "*WIN*")) "windows")
+    (t "other")
+  )
+)
+
+(defun oc:erase-nearby-on-layer (inspt layer radius / p1 p2 ss i en ed typ lay)
+  (setq p1 (list (- (car inspt) radius) (- (cadr inspt) radius) 0.0))
+  (setq p2 (list (+ (car inspt) radius) (+ (cadr inspt) radius) 0.0))
+  (setq ss (ssget "_C" p1 p2))
+  (if ss
+    (progn
+      (setq i 0)
+      (repeat (sslength ss)
+        (setq en (ssname ss i))
+        (setq ed (entget en))
+        (setq typ (cdr (assoc 0 ed)))
+        (setq lay (cdr (assoc 8 ed)))
+        (if (and (= lay layer) (/= typ "INSERT"))
+          (entdel en)
+        )
+        (setq i (1+ i))
+      )
+    )
+  )
+)
+
+(defun oc:replace-geometry-with-blocks (/ ss i en ed typ name inspt category replacedDoors replacedWindows doc outpath)
+  (setq ss (ssget "X" '((0 . "INSERT"))))
+  (setq replacedDoors 0)
+  (setq replacedWindows 0)
+
+  (if ss
+    (progn
+      (setq i 0)
+      (repeat (sslength ss)
+        (setq en (ssname ss i))
+        (setq ed (entget en))
+        (setq typ (cdr (assoc 0 ed)))
+        (setq name (cdr (assoc 2 ed)))
+        (setq inspt (cdr (assoc 10 ed)))
+        (setq category (oc:block-category name))
+
+        (cond
+          ((= category "doors")
+            (oc:erase-nearby-on-layer inspt "DOORS" 1.25)
+            (setq replacedDoors (1+ replacedDoors))
+          )
+          ((= category "windows")
+            (oc:erase-nearby-on-layer inspt "WINDOWS" 2.50)
+            (setq replacedWindows (1+ replacedWindows))
+          )
+        )
+        (setq i (1+ i))
+      )
+    )
+  )
+
+  (setq outpath "C:/Users/moise/Documents/010_MCP/outputs/pruebas_reglas.dwg")
+  (command "._SAVEAS" "2018" outpath)
+  (princ (strcat "\nArchitecture improvements applied. Doors replaced: " (itoa replacedDoors) ", windows replaced: " (itoa replacedWindows)))
+  (princ (strcat "\nSaved as: " outpath "\n"))
+  (princ)
+)
+
+(defun c:ApplyArchitectureImprovements ()
+  (oc:replace-geometry-with-blocks)
+)

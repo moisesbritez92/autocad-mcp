@@ -1,0 +1,4 @@
+(load "C:/Users/moise/Documents/010_MCP/scripts/make_house_rules_blocks.lsp")
+(c:MakeHouseRulesBlocks)
+._QUIT
+Y

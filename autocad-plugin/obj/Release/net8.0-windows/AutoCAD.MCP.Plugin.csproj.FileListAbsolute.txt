@@ -1,0 +1,15 @@
+C:\Users\moise\Documents\010_MCP\autocad-plugin\bin\Release\net8.0-windows\AutoCAD.MCP.Plugin.deps.json
+C:\Users\moise\Documents\010_MCP\autocad-plugin\bin\Release\net8.0-windows\AutoCAD.MCP.Plugin.dll
+C:\Users\moise\Documents\010_MCP\autocad-plugin\bin\Release\net8.0-windows\AutoCAD.MCP.Plugin.pdb
+C:\Users\moise\Documents\010_MCP\autocad-plugin\bin\Release\net8.0-windows\Newtonsoft.Json.dll
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD.MCP.Plugin.csproj.AssemblyReference.cache
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD.MCP.Plugin.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD.MCP.Plugin.AssemblyInfoInputs.cache
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD.MCP.Plugin.AssemblyInfo.cs
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD.MCP.Plugin.csproj.CoreCompileInputs.cache
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD.MCP.Plugin.sourcelink.json
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD..EB1F3263.Up2Date
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD.MCP.Plugin.dll
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\refint\AutoCAD.MCP.Plugin.dll
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\AutoCAD.MCP.Plugin.pdb
+C:\Users\moise\Documents\010_MCP\autocad-plugin\obj\Release\net8.0-windows\ref\AutoCAD.MCP.Plugin.dll

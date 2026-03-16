@@ -1,37 +1,65 @@
-# AutoCAD MCP Server
+# AutoCAD MCP Server & Plugin
 
-This is a Model Context Protocol (MCP) server that allows AI assistants to interact with **Autodesk AutoCAD**.
+This project implements a Model Context Protocol (MCP) server for Autodesk AutoCAD 2026.
+It supports two modes of operation:
+1.  **Headless Execution**: Using `accoreconsole.exe` to run `.scr` and `.lsp` scripts against `.dwg` files.
+2.  **Live Interaction**: Using a custom .NET Plugin loaded into AutoCAD to execute commands in real-time.
 
-It uses the **AutoCAD Core Console** (`accoreconsole.exe`) to execute automation scripts (`.scr`) and AutoLISP (`.lsp`) files against drawing files (`.dwg`).
+## Project Structure
+
+-   `src/`: Node.js MCP Server (TypeScript).
+-   `autocad-plugin/`: C# .NET Plugin for AutoCAD 2026.
+-   `scripts/`: Automation scripts directory.
 
 ## Prerequisites
 
--   **Node.js** (v16 or higher)
--   **Autodesk AutoCAD** installed (tested with 2026, but should work with older versions that have `accoreconsole.exe`).
+-   **Node.js** (v18+)
+-   **Autodesk AutoCAD 2026**
+-   **.NET SDK 8.0** (for building the plugin)
 
-## Configuration
+## Setup
 
-1.  Copy `.env.example` to `.env`.
-2.  Update `AUTOCAD_CONSOLE_PATH` to point to your `accoreconsole.exe`.
-    -   Usually: `C:\Program Files\Autodesk\AutoCAD 2026\accoreconsole.exe`
-3.  Place your automation scripts in the `scripts/` directory (or configure `AUTOCAD_SCRIPTS_DIR`).
+### 1. Build the Node.js Server
+```bash
+npm install
+npm run build
+```
+
+### 2. Build the AutoCAD Plugin
+Open `autocad-plugin/AutoCAD.MCP.Plugin.csproj` in Visual Studio or use CLI:
+```bash
+cd autocad-plugin
+dotnet build -c Release
+```
+This will produce a DLL at `autocad-plugin/bin/Release/net8.0-windows/AutoCAD.MCP.Plugin.dll`.
+
+### 3. Load Plugin into AutoCAD
+1.  Open AutoCAD 2026.
+2.  Type `NETLOAD` command.
+3.  Select the `AutoCAD.MCP.Plugin.dll` built in step 2.
+4.  Set Environment Variable: `setx MCP_AUTOCAD_TOKEN "default-secret-token"` (restart AutoCAD after).
+5.  Wait for the message: `[MCP] Server listening on http://localhost:12345/`.
 
 ## Usage
 
-### Install Dependencies
+Start the MCP Server:
 ```bash
-npm install
-```
-
-### Build & Start
-```bash
-npm run build
 npm start
 ```
 
 ### Available Tools
--   **`list_available_scripts`**: Returns a list of scripts in your configured directory.
--   **`execute_script`**: Runs a script on a specific drawing.
-    -   Arguments:
-        -   `drawingPath`: Full path to the `.dwg`.
-        -   `scriptPath`: Full path to the `.scr`.
+
+-   **`create_line`**: Create a line in the active document.
+    -   Args: `startX`, `startY`, `endX`, `endY`
+-   **`get_layers`**: List all layers.
+-   **`create_layer`**: Create a new layer.
+-   **`execute_script_file`**: Run a .scr file on a .dwg (headless).
+
+## Configuration (.env)
+
+```env
+AUTOCAD_CONSOLE_PATH="C:\Program Files\Autodesk\AutoCAD 2026\accoreconsole.exe"
+AUTOCAD_SCRIPTS_DIR="./scripts"
+AUTOCAD_PLUGIN_URL="http://localhost:12345"
+MCP_AUTOCAD_TOKEN="default-secret-token"
+```

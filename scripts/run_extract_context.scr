@@ -1,0 +1,4 @@
+(load "C:/Users/moise/Documents/010_MCP/scripts/extract_context.lsp")
+(c:ExtractContext)
+._QUIT
+Y

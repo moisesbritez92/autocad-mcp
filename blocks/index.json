@@ -1,0 +1,22 @@
+{
+  "root": "C:\\Users\\moise\\Documents\\010_MCP\\blocks",
+  "count": 2,
+  "blocks": [
+    {
+      "name": "puerta_09",
+      "category": "doors",
+      "path": "C:\\Users\\moise\\Documents\\010_MCP\\blocks\\doors\\puerta_09.dwg",
+      "size_bytes": 28935
+    },
+    {
+      "name": "ventana_2m",
+      "category": "windows",
+      "path": "C:\\Users\\moise\\Documents\\010_MCP\\blocks\\windows\\ventana_2m.dwg",
+      "size_bytes": 29095
+    }
+  ],
+  "by_category": {
+    "doors": 1,
+    "windows": 1
+  }
+}

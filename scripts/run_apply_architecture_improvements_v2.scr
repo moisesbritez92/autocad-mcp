@@ -1,0 +1,4 @@
+(load "C:/Users/moise/Documents/010_MCP/scripts/apply_architecture_improvements_v2.lsp")
+(c:ApplyArchitectureImprovementsV2)
+._QUIT
+Y

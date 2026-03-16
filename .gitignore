@@ -6,3 +6,5 @@ node_modules/
 *.dwg
 *.bak
 .github/
+.openclaw
+outputs/

@@ -1,0 +1,4 @@
+(load "C:/Users/moise/Documents/010_MCP/scripts/export_blocks_from_pruebas.lsp")
+(c:ExportBlocksFromPruebas)
+._QUIT
+Y
