@@ -1,12 +1,16 @@
 import axios from 'axios';
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 const PLUGIN_URL = process.env.AUTOCAD_PLUGIN_URL || "http://localhost:12345";
+const AUTH_TOKEN = process.env.MCP_AUTOCAD_TOKEN || "default-secret-token";
 export async function sendAutoCADCommand(command, args = {}) {
     try {
         const response = await axios.post(PLUGIN_URL, {
             command,
             args
         }, {
+            headers: {
+                "Authorization": `Bearer ${AUTH_TOKEN}`
+            },
             timeout: 5000 // 5 seconds timeout
         });
         if (response.data && response.data.error) {

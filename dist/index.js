@@ -231,12 +231,54 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     },
                     required: ["name"]
                 }
+            },
+            {
+                name: "insert_block",
+                description: "Inserts a block (DWG) into the current drawing.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        blockName: { type: "string", description: "Name of the block definition." },
+                        blockPath: { type: "string", description: "Optional full path to DWG file if block is not loaded." },
+                        x: { type: "number", description: "Insertion X coordinate" },
+                        y: { type: "number", description: "Insertion Y coordinate" },
+                        scale: { type: "number", description: "Uniform scale factor (default 1.0)" },
+                        rotation: { type: "number", description: "Rotation in degrees (default 0.0)" }
+                    },
+                    required: ["blockName", "x", "y"]
+                }
+            },
+            {
+                name: "run_command",
+                description: "Sends a command string to the AutoCAD command line (supports LISP expressions).",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        command: { type: "string", description: "AutoCAD command or LISP expression (e.g. '(load \"script.lsp\")')" }
+                    },
+                    required: ["command"]
+                }
             }
         ]
     };
 });
 // Handler for executing tools
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    // ... existing tools ...
+    if (request.params.name === "insert_block") {
+        const args = request.params.arguments;
+        const result = await sendAutoCADCommand("insert_block", args);
+        return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+    }
+    if (request.params.name === "run_command") {
+        const args = request.params.arguments;
+        const result = await sendAutoCADCommand("run_command", args);
+        return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+    }
     if (request.params.name === "list_available_scripts") {
         const scripts = await listScripts(SCRIPTS_DIR);
         return {

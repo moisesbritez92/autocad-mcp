@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
@@ -20,8 +21,80 @@ namespace AutoCAD.MCP.Plugin
                     return GetLayers();
                 case "create_layer":
                     return CreateLayer(request.Args);
+                case "insert_block":
+                    return InsertBlock(request.Args);
+                case "run_command":
+                    return RunCommand(request.Args);
                 default:
                     throw new ArgumentException($"Unknown command: {request.Command}");
+            }
+        }
+
+        private object RunCommand(Dictionary<string, object>? args)
+        {
+            if (args == null) throw new ArgumentNullException(nameof(args));
+            string command = args["command"]?.ToString() ?? "";
+            
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            
+            // SendStringToExecute is async and "fire and forget" from the API perspective,
+            // but it queues the command for the command line.
+            // Note: This doesn't return the output of the command.
+            doc.SendStringToExecute($"{command} ", true, false, false);
+            
+            return new { status = "success", message = "Command queued" };
+        }
+
+        private object InsertBlock(Dictionary<string, object>? args)
+        {
+            if (args == null) throw new ArgumentNullException(nameof(args));
+            
+            string blockName = args["blockName"]?.ToString() ?? "";
+            string blockPath = args.ContainsKey("blockPath") ? args["blockPath"]?.ToString() : null;
+            double x = Convert.ToDouble(args["x"]);
+            double y = Convert.ToDouble(args["y"]);
+            double scale = args.ContainsKey("scale") ? Convert.ToDouble(args["scale"]) : 1.0;
+            double rotation = args.ContainsKey("rotation") ? Convert.ToDouble(args["rotation"]) : 0.0;
+            
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var db = doc.Database;
+
+            using (Transaction tr = db.TransactionManager.StartTransaction())
+            {
+                BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                ObjectId blockId = ObjectId.Null;
+
+                if (bt.Has(blockName))
+                {
+                    blockId = bt[blockName];
+                }
+                else if (!string.IsNullOrEmpty(blockPath) && File.Exists(blockPath))
+                {
+                    // Import block from file
+                    using (Database tempDb = new Database(false, true))
+                    {
+                        tempDb.ReadDwgFile(blockPath, FileOpenMode.OpenForReadAndAllShare, true, "");
+                        blockId = db.Insert(blockName, tempDb, true);
+                    }
+                }
+                else
+                {
+                    return new { status = "error", message = $"Block '{blockName}' not found and no valid path provided." };
+                }
+
+                BlockTableRecord btr = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+
+                using (BlockReference br = new BlockReference(new Point3d(x, y, 0), blockId))
+                {
+                    br.ScaleFactors = new Scale3d(scale);
+                    br.Rotation = rotation * (Math.PI / 180.0); // Convert degrees to radians if input is degrees
+
+                    btr.AppendEntity(br);
+                    tr.AddNewlyCreatedDBObject(br, true);
+                }
+
+                tr.Commit();
+                return new { status = "success", message = $"Block {blockName} inserted" };
             }
         }
 
