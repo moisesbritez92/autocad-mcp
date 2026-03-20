@@ -55,6 +55,34 @@ npm start
 -   **`create_layer`**: Create a new layer.
 -   **`execute_script_file`**: Run a .scr file on a .dwg (headless).
 
+### Available Prompts
+
+-   **`house_generator`**: Prompt template that guides the assistant to call `generate_house_plan`.
+        -   Optional args: `bedrooms`, `bathrooms`, `lot_width`, `lot_depth`, `style`, `requirements`, `output_path`.
+        -   Example defaults generate: `Casa de 3 dormitorios, 2 banos, lote 10x8, estilo linear`.
+
+## Quick Example (Prompt -> House)
+
+From any MCP client that supports prompts:
+1. Request prompt list (`prompts/list`) and select `house_generator`.
+2. Request prompt content (`prompts/get`) with args, for example:
+
+```json
+{
+    "name": "house_generator",
+    "arguments": {
+        "bedrooms": "3",
+        "bathrooms": "2",
+        "lot_width": "12",
+        "lot_depth": "9",
+        "style": "open",
+        "requirements": "Incluye terraza trasera y cocina integrada"
+    }
+}
+```
+
+3. Execute the returned instruction; it will call `generate_house_plan` with a ready payload.
+
 ## Configuration (.env)
 
 ```env

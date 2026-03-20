@@ -8,3 +8,6 @@ node_modules/
 .github/
 .openclaw
 outputs/
+# Auto-generated temp scripts (keep directory, ignore generated files)
+temp/*.lsp
+temp/*.scr

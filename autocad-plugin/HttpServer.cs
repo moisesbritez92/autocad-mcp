@@ -118,63 +118,37 @@ namespace AutoCAD.MCP.Plugin
         }
 
         // Helper to run code on AutoCAD main thread
+        // Correct pattern: use Application.DocumentManager.ExecuteInCommandContextAsync
+        // which queues work on AutoCAD's main execution thread and awaits the result.
         private Task<object> ExecuteOnMainThread(Func<object> action)
         {
-            var tcs = new TaskCompletionSource<object>();
-            
-            // Assuming we are in a valid context or using proper marshalling
-            // In pure AutoCAD .NET, we often need to use Application.DocumentManager.ExecuteInCommandContext 
-            // or lock the document. For external async calls, we need to marshal to the UI thread.
-            
-            // Simple approach: Use Application.Idle or similar if needed, 
-            // but usually we need to lock the document.
-            
-            Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.WriteMessage("\n[MCP] Processing command...");
+            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            // Marshaling to main thread is critical in AutoCAD
-            // Since we are in an async Task, we are likely on a thread pool thread.
-            // We need to queue this to the main thread.
-            
-            // Warning: This is a simplification. Robust implementations use a custom marshaler or IExtensionApplication's context.
-            // For this POC, we will try to use the Document lock directly, but it might fail if called from a background thread.
-            // A better way is strictly necessary for production.
-            
-            // Start a new transaction in the document context
-            try {
-               // Execute synchronously (blocking the thread pool thread) but inside a lock? No.
-               // We must use the main thread.
-               // One way: Application.Invoke makes it run on main thread? No.
-               
-               // Correct approach for async external command: 
-               // We can't easily "await" the main thread from here without a custom message loop hook.
-               // BUT, simpler approach: Just try locking. If it throws "eNotMainThread", we know.
-               // Most AutoCAD APIs MUST be called from main thread.
-               
-               // Using a dirty hack for POC: just run it. If it fails, we need the "proper" marshaling which is complex.
-               // Actually, let's assume we can run simple commands or we use a helper.
-               
-               // Let's implement a minimal synchronous execution for now.
-               
-               // Better: Document.SendStringToExecute (async, fire and forget)
-               // But we need a return value.
-               
-               // Let's rely on Document.LockDocument() which *might* work if we are lucky, 
-               // but typically we need to wrap in `Application.DocumentManager.ExecuteInCommandContext` 
-               // or use `Marshaler`.
-               
-               // For this implementation, I will just run it and catch errors.
-               
-               var doc = Application.DocumentManager.MdiActiveDocument;
-               using (doc.LockDocument())
-               {
-                   var res = action();
-                   tcs.SetResult(res);
-               }
-            }
-            catch (Exception ex)
+            // ExecuteInCommandContextAsync marshals the delegate to AutoCAD's main command thread.
+            // This is the supported API for calling AutoCAD database operations from a background thread.
+            Application.DocumentManager.ExecuteInCommandContextAsync(async (unused) =>
             {
-                tcs.SetException(ex);
-            }
+                await Task.Yield(); // yield to ensure we are truly on the command context thread
+                try
+                {
+                    var doc = Application.DocumentManager.MdiActiveDocument;
+                    if (doc == null)
+                    {
+                        tcs.SetException(new InvalidOperationException("No active AutoCAD document."));
+                        return;
+                    }
+
+                    using (doc.LockDocument())
+                    {
+                        var result = action();
+                        tcs.SetResult(result);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            }, null);
 
             return tcs.Task;
         }

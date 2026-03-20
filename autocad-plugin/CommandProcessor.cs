@@ -25,6 +25,8 @@ namespace AutoCAD.MCP.Plugin
                     return InsertBlock(request.Args);
                 case "run_command":
                     return RunCommand(request.Args);
+                case "run_lsp_script":
+                    return RunLspScript(request.Args);
                 default:
                     throw new ArgumentException($"Unknown command: {request.Command}");
             }
@@ -43,6 +45,31 @@ namespace AutoCAD.MCP.Plugin
             doc.SendStringToExecute($"{command} ", true, false, false);
             
             return new { status = "success", message = "Command queued" };
+        }
+
+        private object RunLspScript(Dictionary<string, object>? args)
+        {
+            if (args == null) throw new ArgumentNullException(nameof(args));
+            string lspPath = args["lspPath"]?.ToString() ?? "";
+
+            if (string.IsNullOrWhiteSpace(lspPath))
+                return new { status = "error", message = "lspPath is required" };
+
+            // Normalise path separators for AutoLISP (forward slashes)
+            string lispPath = lspPath.Replace('\\', '/');
+
+            if (!File.Exists(lspPath))
+                return new { status = "error", message = $"LSP file not found: {lspPath}" };
+
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+                return new { status = "error", message = "No active AutoCAD document" };
+
+            // (load "path") is the standard AutoLISP way to execute a script file.
+            // SendStringToExecute queues it on the command thread, respecting the document lock.
+            doc.SendStringToExecute($"(load \"{lispPath}\") ", true, false, false);
+
+            return new { status = "success", message = $"LSP queued for execution: {lspPath}" };
         }
 
         private object InsertBlock(Dictionary<string, object>? args)

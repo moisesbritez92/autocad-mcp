@@ -10,6 +10,24 @@ export interface AutoCADResponse {
     [key: string]: any;
 }
 
+/**
+ * Checks whether the AutoCAD plugin is reachable (non-throwing).
+ * Returns true if the plugin responds with any HTTP status ≤ 499.
+ */
+export async function isPluginAvailable(): Promise<boolean> {
+    try {
+        // We deliberately send a request and accept any 4xx (auth/method) as "alive"
+        await axios.post(PLUGIN_URL, { command: "__ping__", args: {} }, {
+            headers: { "Authorization": `Bearer ${AUTH_TOKEN}` },
+            timeout: 2000,
+            validateStatus: s => s < 500,
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export async function sendAutoCADCommand(command: string, args: Record<string, any> = {}): Promise<AutoCADResponse> {
     try {
         const response = await axios.post(PLUGIN_URL, {
