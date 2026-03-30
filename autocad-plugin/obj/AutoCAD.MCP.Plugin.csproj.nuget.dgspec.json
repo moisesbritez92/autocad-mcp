@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\moise\\Documents\\010_MCP\\autocad-plugin\\AutoCAD.MCP.Plugin.csproj": {}
+    "C:\\Users\\moise\\Documents\\010_MCP_CAD\\autocad-plugin\\AutoCAD.MCP.Plugin.csproj": {}
   },
   "projects": {
-    "C:\\Users\\moise\\Documents\\010_MCP\\autocad-plugin\\AutoCAD.MCP.Plugin.csproj": {
+    "C:\\Users\\moise\\Documents\\010_MCP_CAD\\autocad-plugin\\AutoCAD.MCP.Plugin.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\moise\\Documents\\010_MCP\\autocad-plugin\\AutoCAD.MCP.Plugin.csproj",
+        "projectUniqueName": "C:\\Users\\moise\\Documents\\010_MCP_CAD\\autocad-plugin\\AutoCAD.MCP.Plugin.csproj",
         "projectName": "AutoCAD.MCP.Plugin",
-        "projectPath": "C:\\Users\\moise\\Documents\\010_MCP\\autocad-plugin\\AutoCAD.MCP.Plugin.csproj",
+        "projectPath": "C:\\Users\\moise\\Documents\\010_MCP_CAD\\autocad-plugin\\AutoCAD.MCP.Plugin.csproj",
         "packagesPath": "C:\\Users\\moise\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\moise\\Documents\\010_MCP\\autocad-plugin\\obj\\",
+        "outputPath": "C:\\Users\\moise\\Documents\\010_MCP_CAD\\autocad-plugin\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\moise\\AppData\\Roaming\\NuGet\\NuGet.Config"

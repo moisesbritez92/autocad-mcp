@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AutoCAD.MCP.Plugin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+237269d8131312655760a0153e35a1183b14cf18")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ff2a76a710b22127c16a534af8254f954c9133ba")]
 [assembly: System.Reflection.AssemblyProductAttribute("AutoCAD.MCP.Plugin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AutoCAD.MCP.Plugin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
