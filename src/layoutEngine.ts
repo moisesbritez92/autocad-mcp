@@ -24,12 +24,12 @@ import type {
 const RULES = {
   bedroom_min_area: 8.0,
   master_bedroom_min_area: 11.0,
-  bathroom_min_area: 3.0,
+  bathroom_min_area: 3.5,
   hallway_min_width: 0.9,
-  door_width: 0.9,        // standard door cut in wall
-  window_width: 1.8,      // standard window cut (ventana_2m block width ≈ 2m)
-  window_depth_cut: 0.45, // how far window notch protrudes through wall
-  door_depth_cut: 0.50,   // door opening depth through wall
+  door_width: 0.9,              // exterior door opening
+  interior_door_width: 0.8,    // interior door opening (puerta_08)
+  window_width: 1.8,           // standard window cut (ventana_2m block scaled)
+  wall_cut_margin: 0.10,       // margin beyond wall face for boolean cuts
   corridor_ratio_max: 0.10,
   aspect_ratio_max: 2.0,
 };
@@ -72,11 +72,11 @@ function getDefaultLabel(type: RoomType, index: number): string {
 const DEFAULT_MIN_AREAS: Partial<Record<RoomType, number>> = {
   bedroom:         8.0,
   master_bedroom: 11.0,
-  bathroom:        3.0,
+  bathroom:        3.5,
   half_bath:       2.0,
-  living_room:    12.0,
-  living_kitchen: 14.0,
-  living_dining:  14.0,
+  living_room:    18.0,
+  living_kitchen: 18.0,
+  living_dining:  18.0,
   kitchen:         6.0,
   dining_room:     8.0,
   hallway:         3.0,
@@ -138,24 +138,24 @@ function computeStripWidths(
 
   let pubW  = Math.max(usable * pubRatio,  minPub);
   let tranW = Math.max(usable * tranRatio, minTran);
+
+  // Cap transit strip — bathrooms/hallways rarely need > 2.2m width
+  const MAX_TRANSIT = 2.2;
+  tranW = Math.min(tranW, MAX_TRANSIT);
+
   // Give private the rest, at least its minimum
   let privW = Math.max(usable - pubW - tranW - 2 * wallInt, minPriv);
 
-  // If total still exceeds usable, scale back proportionally
+  // If total still exceeds usable, shrink public & private proportionally
   const allocated = pubW + tranW + privW + 2 * wallInt;
   if (allocated > usable + 0.001) {
-    // Try to shrink transit (bathrooms are flexible) first
     const excess = allocated - usable;
-    const shrinkTran = Math.min(excess * 0.5, tranW - minTran);
-    tranW -= Math.max(0, shrinkTran);
-    const excess2 = pubW + tranW + privW + 2 * wallInt - usable;
-    if (excess2 > 0.001) {
-      // Last resort: scale all proportionally
-      const scale = usable / (pubW + tranW + privW + 2 * wallInt);
-      pubW  *= scale;
-      tranW *= scale;
-      privW *= scale;
-    }
+    const pubPriv = pubW + privW;
+    pubW  -= excess * (pubW / pubPriv);
+    privW -= excess * (privW / pubPriv);
+    // Enforce floor minimums
+    pubW  = Math.max(pubW, minPub);
+    privW = Math.max(privW, minPriv);
   }
 
   return {
@@ -188,11 +188,14 @@ function placeRoomsInStrip(
   let currentY = wallExt;
   let idCounter = startId;
 
-  for (const room of rooms) {
+  for (let idx = 0; idx < rooms.length; idx++) {
+    const room = rooms[idx];
+    const isLast = idx === rooms.length - 1;
     const rx1 = x1;
     const ry1 = currentY;
     const rx2 = x2;
-    const ry2 = currentY + heightPerRoom - wallInt;
+    // Last room extends to north wall inner face (no wasted gap)
+    const ry2 = isLast ? (lotDepth - wallExt) : (currentY + heightPerRoom - wallInt);
 
     const area = (rx2 - rx1) * (ry2 - ry1);
 
@@ -228,30 +231,31 @@ function placeDoor(
   fromRoom: PlacedRoom,
   toRoom: PlacedRoom,
   wallInt: number,
-  blockPath: string
+  blockPath: string,
+  doorWidth: number = RULES.interior_door_width
 ): DoorSpec | null {
   // Shared vertical wall (fromRoom on left, toRoom on right)
   const sharedX = fromRoom.x2;
   if (Math.abs(toRoom.x1 - sharedX) < wallInt + 0.01) {
     const overlapY1 = Math.max(fromRoom.y1, toRoom.y1);
     const overlapY2 = Math.min(fromRoom.y2, toRoom.y2);
-    if (overlapY2 - overlapY1 < RULES.door_width) return null;
+    if (overlapY2 - overlapY1 < doorWidth) return null;
 
     const midY = (overlapY1 + overlapY2) / 2;
-    const insertX = sharedX - 0.01;
-    const insertY = midY - RULES.door_width / 2;
 
     return {
       kind: "door",
-      x: parseFloat(insertX.toFixed(3)),
-      y: parseFloat((midY - RULES.door_width / 2).toFixed(3)),
-      rotation: 90,  // door sits in a vertical wall → block must rotate 90° to align with wall
-      width: RULES.door_width,
+      // Insert at wall LEFT face (fromRoom side), at bottom of door opening
+      x: parseFloat(sharedX.toFixed(3)),
+      y: parseFloat((midY - doorWidth / 2).toFixed(3)),
+      rotation: 90,  // door sits in a vertical wall → block rotated 90°
+      width: doorWidth,
       blockPath,
-      cutX1: parseFloat((sharedX - wallInt / 2 - 0.05).toFixed(3)),
-      cutY1: parseFloat((midY - RULES.door_width / 2).toFixed(3)),
-      cutX2: parseFloat((sharedX + wallInt / 2 + 0.05).toFixed(3)),
-      cutY2: parseFloat((midY + RULES.door_width / 2).toFixed(3)),
+      // Cut spans from fromRoom.x2 to toRoom.x1 (exact wall extent)
+      cutX1: parseFloat(sharedX.toFixed(3)),
+      cutY1: parseFloat((midY - doorWidth / 2).toFixed(3)),
+      cutX2: parseFloat(toRoom.x1.toFixed(3)),
+      cutY2: parseFloat((midY + doorWidth / 2).toFixed(3)),
     };
   }
 
@@ -260,21 +264,23 @@ function placeDoor(
   if (Math.abs(toRoom.y1 - sharedY) < wallInt + 0.01) {
     const overlapX1 = Math.max(fromRoom.x1, toRoom.x1);
     const overlapX2 = Math.min(fromRoom.x2, toRoom.x2);
-    if (overlapX2 - overlapX1 < RULES.door_width) return null;
+    if (overlapX2 - overlapX1 < doorWidth) return null;
 
     const midX = (overlapX1 + overlapX2) / 2;
 
     return {
       kind: "door",
-      x: parseFloat((midX - RULES.door_width / 2).toFixed(3)),
-      y: parseFloat((sharedY - 0.01).toFixed(3)),
-      rotation: 0,  // door sits in a horizontal wall → block at 0° (long axis along X)
-      width: RULES.door_width,
+      // Insert at left of door opening, at wall TOP face (toRoom side)
+      x: parseFloat((midX - doorWidth / 2).toFixed(3)),
+      y: parseFloat(toRoom.y1.toFixed(3)),
+      rotation: 0,  // door sits in a horizontal wall → block at 0°
+      width: doorWidth,
       blockPath,
-      cutX1: parseFloat((midX - RULES.door_width / 2).toFixed(3)),
-      cutY1: parseFloat((sharedY - wallInt / 2 - 0.05).toFixed(3)),
-      cutX2: parseFloat((midX + RULES.door_width / 2).toFixed(3)),
-      cutY2: parseFloat((sharedY + wallInt / 2 + 0.05).toFixed(3)),
+      // Cut spans from fromRoom.y2 to toRoom.y1 (exact wall extent)
+      cutX1: parseFloat((midX - doorWidth / 2).toFixed(3)),
+      cutY1: parseFloat(sharedY.toFixed(3)),
+      cutX2: parseFloat((midX + doorWidth / 2).toFixed(3)),
+      cutY2: parseFloat(toRoom.y1.toFixed(3)),
     };
   }
 
@@ -287,9 +293,10 @@ function placeExteriorDoor(
   wallExt: number,
   blockPath: string
 ): DoorSpec {
-  // Place on south wall of the public room
+  // Place on south wall of the public room, slightly left of center
   const midX = (room.x1 + room.x2) / 2;
-  const entryX = midX - RULES.door_width / 2 + 0.3;
+  const entryX = midX - RULES.door_width / 2;
+  const m = RULES.wall_cut_margin;
 
   return {
     kind: "door",
@@ -299,9 +306,9 @@ function placeExteriorDoor(
     width: RULES.door_width,
     blockPath,
     cutX1: parseFloat(entryX.toFixed(3)),
-    cutY1: parseFloat((-0.1).toFixed(3)),
+    cutY1: parseFloat((-m).toFixed(3)),
     cutX2: parseFloat((entryX + RULES.door_width).toFixed(3)),
-    cutY2: parseFloat((wallExt + 0.1).toFixed(3)),
+    cutY2: parseFloat((wallExt + m).toFixed(3)),
   };
 }
 
@@ -315,50 +322,86 @@ function placeWindowsForRoom(
 ): WindowSpec[] {
   const windows: WindowSpec[] = [];
   const w = RULES.window_width;
-  const d = RULES.window_depth_cut;
+  const m = RULES.wall_cut_margin;
 
-  // North wall (top)
+  // ── North wall (top) — room.y2 touches inner face of north exterior wall
   if (Math.abs(room.y2 - (lotD - wallExt)) < 0.05) {
     const cx = (room.x1 + room.x2) / 2;
     const wx = cx - w / 2;
     if (wx >= room.x1 && wx + w <= room.x2) {
       windows.push({
-        kind: "window", x: parseFloat(wx.toFixed(3)), y: parseFloat((lotD - wallExt / 2).toFixed(3)),
-        rotation: 0, width: w, facing: "N", blockPath, wallDepthCut: d,
-        cutX1: parseFloat(wx.toFixed(3)), cutY1: parseFloat((lotD - wallExt - d).toFixed(3)),
-        cutX2: parseFloat((wx + w).toFixed(3)), cutY2: parseFloat((lotD + d).toFixed(3)),
+        kind: "window",
+        x: parseFloat(wx.toFixed(3)),
+        y: parseFloat((lotD - wallExt).toFixed(3)),  // inner wall face
+        rotation: 0, width: w, facing: "N", blockPath,
+        wallDepthCut: wallExt + 2 * m,
+        cutX1: parseFloat(wx.toFixed(3)),
+        cutY1: parseFloat((lotD - wallExt - m).toFixed(3)),
+        cutX2: parseFloat((wx + w).toFixed(3)),
+        cutY2: parseFloat((lotD + m).toFixed(3)),
       });
-      return windows; // one window per room wall is enough
+      return windows; // one window per room is enough
     }
   }
 
-  // South wall (bottom) — skip if it's exterior entry wall
+  // ── South wall (bottom) — skip public rooms (entry door is there)
   if (Math.abs(room.y1 - wallExt) < 0.05 && room.zone !== "public") {
     const cx = (room.x1 + room.x2) / 2;
     const wx = cx - w / 2;
     if (wx >= room.x1 && wx + w <= room.x2) {
       windows.push({
-        kind: "window", x: parseFloat(wx.toFixed(3)), y: 0,
-        rotation: 0, width: w, facing: "S", blockPath, wallDepthCut: d,
-        cutX1: parseFloat(wx.toFixed(3)), cutY1: parseFloat((-d).toFixed(3)),
-        cutX2: parseFloat((wx + w).toFixed(3)), cutY2: parseFloat((wallExt + d).toFixed(3)),
+        kind: "window",
+        x: parseFloat(wx.toFixed(3)),
+        y: 0,  // block at outer wall edge (same as reference)
+        rotation: 0, width: w, facing: "S", blockPath,
+        wallDepthCut: wallExt + 2 * m,
+        cutX1: parseFloat(wx.toFixed(3)),
+        cutY1: parseFloat((-m).toFixed(3)),
+        cutX2: parseFloat((wx + w).toFixed(3)),
+        cutY2: parseFloat((wallExt + m).toFixed(3)),
       });
       return windows;
     }
   }
 
-  // East wall (right)
+  // ── East wall (right) — room.x2 touches inner face of east exterior wall
   if (Math.abs(room.x2 - (lotW - wallExt)) < 0.05) {
     const cy = (room.y1 + room.y2) / 2;
     const roomH = room.y2 - room.y1;
-    const wy = cy - Math.min(w, roomH * 0.6) / 2;
     const wh = Math.min(w, roomH * 0.6);
+    const wy = cy - wh / 2;
     windows.push({
-      kind: "window", x: parseFloat((lotW - wallExt / 2).toFixed(3)), y: parseFloat(wy.toFixed(3)),
-      rotation: 90, width: wh, facing: "E", blockPath, wallDepthCut: d,
-      cutX1: parseFloat((lotW - wallExt - d).toFixed(3)), cutY1: parseFloat(wy.toFixed(3)),
-      cutX2: parseFloat((lotW + d).toFixed(3)), cutY2: parseFloat((wy + wh).toFixed(3)),
+      kind: "window",
+      x: parseFloat((lotW - wallExt).toFixed(3)),  // inner wall face
+      y: parseFloat(wy.toFixed(3)),
+      rotation: 90, width: wh, facing: "E", blockPath,
+      wallDepthCut: wallExt + 2 * m,
+      cutX1: parseFloat((lotW - wallExt - m).toFixed(3)),
+      cutY1: parseFloat(wy.toFixed(3)),
+      cutX2: parseFloat((lotW + m).toFixed(3)),
+      cutY2: parseFloat((wy + wh).toFixed(3)),
     });
+    return windows;
+  }
+
+  // ── West wall (left) — room.x1 touches inner face of west exterior wall
+  if (Math.abs(room.x1 - wallExt) < 0.05) {
+    const cy = (room.y1 + room.y2) / 2;
+    const roomH = room.y2 - room.y1;
+    const wh = Math.min(w, roomH * 0.6);
+    const wy = cy - wh / 2;
+    windows.push({
+      kind: "window",
+      x: 0,  // block at outer wall edge
+      y: parseFloat(wy.toFixed(3)),
+      rotation: 90, width: wh, facing: "W", blockPath,
+      wallDepthCut: wallExt + 2 * m,
+      cutX1: parseFloat((-m).toFixed(3)),
+      cutY1: parseFloat(wy.toFixed(3)),
+      cutX2: parseFloat((wallExt + m).toFixed(3)),
+      cutY2: parseFloat((wy + wh).toFixed(3)),
+    });
+    return windows;
   }
 
   return windows;
@@ -422,8 +465,9 @@ export function generateLayout(spec: HouseSpec, blockRoot: string): LayoutResult
   const lotW    = spec.lot_width;
   const lotD    = spec.lot_depth;
 
-  const doorBlockPath   = `${blockRoot}/doors/puerta_09.dwg`.replace(/\\/g, "/");
-  const windowBlockPath = `${blockRoot}/windows/ventana_2m.dwg`.replace(/\\/g, "/");
+  const doorBlockPath         = `${blockRoot}/doors/puerta_09.dwg`.replace(/\\/g, "/");
+  const interiorDoorBlockPath = `${blockRoot}/doors/puerta_08.dwg`.replace(/\\/g, "/");
+  const windowBlockPath       = `${blockRoot}/windows/ventana_2m.dwg`.replace(/\\/g, "/");
 
   // Expand room specs into individual rooms, skip terraces (handled separately)
   const allRooms = expandRooms(spec.rooms.filter(r => r.type !== "terrace"));
@@ -486,7 +530,7 @@ export function generateLayout(spec: HouseSpec, blockRoot: string): LayoutResult
   // Public ↔ Transit connections
   for (const pub of placedPublic) {
     for (const trans of placedTransit) {
-      const d = placeDoor(pub, trans, wallInt, doorBlockPath);
+      const d = placeDoor(pub, trans, wallInt, interiorDoorBlockPath, RULES.interior_door_width);
       if (d) { doors.push(d); break; }
     }
   }
@@ -496,10 +540,10 @@ export function generateLayout(spec: HouseSpec, blockRoot: string): LayoutResult
     const bestTrans = placedTransit.find(t => {
       const overlapY1 = Math.max(t.y1, priv.y1);
       const overlapY2 = Math.min(t.y2, priv.y2);
-      return overlapY2 - overlapY1 >= RULES.door_width;
+      return overlapY2 - overlapY1 >= RULES.interior_door_width;
     });
     if (bestTrans) {
-      const d = placeDoor(bestTrans, priv, wallInt, doorBlockPath);
+      const d = placeDoor(bestTrans, priv, wallInt, interiorDoorBlockPath, RULES.interior_door_width);
       if (d) doors.push(d);
     }
   }
@@ -508,21 +552,23 @@ export function generateLayout(spec: HouseSpec, blockRoot: string): LayoutResult
   if (includeTerrace && placedTransit.length > 0) {
     const terrace = allPlacedRooms.find(r => r.type === "terrace");
     if (terrace) {
-      // Door on the north wall of the topmost transit room (horizontal wall → rotation=0)
+      // Door on the north wall of the topmost transit room
       const topTrans = [...placedTransit].sort((a, b) => b.y2 - a.y2)[0];
       const midX = (topTrans.x1 + topTrans.x2) / 2;
-      const dx = midX - RULES.door_width / 2;
+      const dx = midX - RULES.interior_door_width / 2;
+      const m = RULES.wall_cut_margin;
       doors.push({
         kind: "door",
         x: parseFloat(dx.toFixed(3)),
         y: parseFloat(lotD.toFixed(3)),
-        rotation: 0,  // horizontal wall (runs along X) → door block at 0°
-        width: RULES.door_width,
-        blockPath: doorBlockPath,
+        rotation: 0,
+        width: RULES.interior_door_width,
+        blockPath: interiorDoorBlockPath,
+        // Cut through north exterior wall + terrace south wall
         cutX1: parseFloat(dx.toFixed(3)),
-        cutY1: parseFloat((lotD - 0.1).toFixed(3)),
-        cutX2: parseFloat((dx + RULES.door_width).toFixed(3)),
-        cutY2: parseFloat((lotD + terraceDepth * 0.3).toFixed(3)),
+        cutY1: parseFloat((lotD - wallExt - m).toFixed(3)),
+        cutX2: parseFloat((dx + RULES.interior_door_width).toFixed(3)),
+        cutY2: parseFloat((lotD + m).toFixed(3)),
       });
     }
   }

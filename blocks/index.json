@@ -1,22 +1,37 @@
 {
-  "root": "C:\\Users\\moise\\Documents\\010_MCP\\blocks",
-  "count": 2,
+  "root": "C:\\Users\\moise\\Documents\\010_MCP_CAD\\blocks",
+  "count": 3,
   "blocks": [
+    {
+      "name": "puerta_08",
+      "category": "doors",
+      "path": "C:\\Users\\moise\\Documents\\010_MCP_CAD\\blocks\\doors\\puerta_08.dwg",
+      "size_bytes": 29693,
+      "nominal_width": 0.8,
+      "door_type": "single_swing",
+      "description": "Single swing interior door 0.8m width"
+    },
     {
       "name": "puerta_09",
       "category": "doors",
-      "path": "C:\\Users\\moise\\Documents\\010_MCP\\blocks\\doors\\puerta_09.dwg",
-      "size_bytes": 28935
+      "path": "C:\\Users\\moise\\Documents\\010_MCP_CAD\\blocks\\doors\\puerta_09.dwg",
+      "size_bytes": 28935,
+      "nominal_width": 0.9,
+      "door_type": "single_swing",
+      "description": "Single swing exterior door 0.9m width"
     },
     {
       "name": "ventana_2m",
       "category": "windows",
-      "path": "C:\\Users\\moise\\Documents\\010_MCP\\blocks\\windows\\ventana_2m.dwg",
-      "size_bytes": 29095
+      "path": "C:\\Users\\moise\\Documents\\010_MCP_CAD\\blocks\\windows\\ventana_2m.dwg",
+      "size_bytes": 29095,
+      "nominal_width": 2.0,
+      "window_type": "standard",
+      "description": "Standard window 2m width"
     }
   ],
   "by_category": {
-    "doors": 1,
+    "doors": 2,
     "windows": 1
   }
 }

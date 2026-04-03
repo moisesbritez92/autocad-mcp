@@ -96,3 +96,50 @@ export interface Layout {
   doors: DoorSpec[];
   windows: WindowSpec[];
 }
+
+// ── Validation & Metrics ──────────────────────────────────────
+export interface ValidationCheck {
+  rule: string;
+  result: "pass" | "warn" | "fail";
+  message: string;
+  room?: string;
+}
+
+export interface DesignQuality {
+  design_score: number;
+  lighting_score: number;
+  circulation_score: number;
+  space_efficiency: number;
+  room_proportions: number;
+}
+
+export interface DetectedRoom {
+  label: string;
+  area?: number;
+  connected_doors?: string[];
+  connected_windows?: string[];
+}
+
+export interface DetectedOpenings {
+  doors: Array<{ handle?: string; position?: { x: number; y: number } }>;
+  windows: Array<{ handle?: string; position?: { x: number; y: number } }>;
+}
+
+export interface DrawingMetrics {
+  total_area: number;
+  wall_count: number;
+  room_count: number;
+  door_count: number;
+  window_count: number;
+  glazing_ratio?: number;
+  circulation_ratio?: number;
+}
+
+export interface ValidationResult {
+  rooms: DetectedRoom[];
+  openings: DetectedOpenings;
+  validation: ValidationCheck[];
+  design_quality: DesignQuality;
+  agent_hints: Record<string, unknown>;
+  metrics: DrawingMetrics;
+}

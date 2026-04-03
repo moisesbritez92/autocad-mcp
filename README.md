@@ -1,19 +1,25 @@
 # AutoCAD MCP Server & Plugin
 
-This project implements a Model Context Protocol (MCP) server for Autodesk AutoCAD 2026.
-It supports two modes of operation:
-1.  **Headless Execution**: Using `accoreconsole.exe` to run `.scr` and `.lsp` scripts against `.dwg` files.
-2.  **Live Interaction**: Using a custom .NET Plugin loaded into AutoCAD to execute commands in real-time.
+Model Context Protocol (MCP) server for **Autodesk AutoCAD 2026**.
+Two modes of operation:
+1.  **Headless** — `accoreconsole.exe` runs `.scr` / `.lsp` scripts against `.dwg` files (batch / CI).
+2.  **Live Plugin** — .NET plugin loaded into AutoCAD, communicated via HTTP on `localhost:12345`.
 
 ## Project Structure
 
--   `src/`: Node.js MCP Server (TypeScript).
--   `autocad-plugin/`: C# .NET Plugin for AutoCAD 2026.
--   `scripts/`: Automation scripts directory.
+```
+src/              Node.js MCP Server (TypeScript)
+autocad-plugin/   C# .NET Plugin for AutoCAD 2026
+scripts/          Automation scripts (.scr, .lsp)
+blocks/           Block library (.dwg) with index.json
+outputs/          Generated DWG/PDF outputs
+semantic_cad/     Python semantic analysis pipeline
+rules/            Architecture validation rules
+```
 
 ## Prerequisites
 
--   **Node.js** (v18+)
+-   **Node.js** v18+
 -   **Autodesk AutoCAD 2026**
 -   **.NET SDK 8.0** (for building the plugin)
 
@@ -26,62 +32,128 @@ npm run build
 ```
 
 ### 2. Build the AutoCAD Plugin
-Open `autocad-plugin/AutoCAD.MCP.Plugin.csproj` in Visual Studio or use CLI:
 ```bash
 cd autocad-plugin
 dotnet build -c Release
 ```
-This will produce a DLL at `autocad-plugin/bin/Release/net8.0-windows/AutoCAD.MCP.Plugin.dll`.
+Output: `autocad-plugin/bin/Release/net8.0-windows/AutoCAD.MCP.Plugin.dll`
 
 ### 3. Load Plugin into AutoCAD
-1.  Open AutoCAD 2026.
-2.  Type `NETLOAD` command.
-3.  Select the `AutoCAD.MCP.Plugin.dll` built in step 2.
-4.  Set Environment Variable: `setx MCP_AUTOCAD_TOKEN "default-secret-token"` (restart AutoCAD after).
-5.  Wait for the message: `[MCP] Server listening on http://localhost:12345/`.
+1. Open AutoCAD 2026.
+2. Type `NETLOAD` command.
+3. Select `AutoCAD.MCP.Plugin.dll` from step 2.
+4. Set env var: `setx MCP_AUTOCAD_TOKEN "default-secret-token"` (restart AutoCAD after).
+5. Wait for: `[MCP] Server listening on http://localhost:12345/`.
 
 ## Usage
 
-Start the MCP Server:
 ```bash
 npm start
 ```
 
-### Available Tools
+### Available Tools (45 total)
 
--   **`create_line`**: Create a line in the active document.
-    -   Args: `startX`, `startY`, `endX`, `endY`
--   **`get_layers`**: List all layers.
--   **`create_layer`**: Create a new layer.
--   **`execute_script_file`**: Run a .scr file on a .dwg (headless).
+#### Geometry Creation (10)
+| Tool | Description |
+|------|-------------|
+| `create_line` | Line from two points |
+| `create_circle` | Circle by center + radius |
+| `create_arc` | Arc by center, radius, start/end angles |
+| `create_polyline` | Polyline with optional bulge (arcs) |
+| `create_rectangle` | Rectangle from two corners |
+| `create_ellipse` | Ellipse by center + radii |
+| `create_spline` | Spline through fit points |
+| `create_hatch` | Hatch fill inside boundary entities |
+| `create_mtext` | Multiline text (MText) |
+| `create_text` | Single-line text (DBText) |
 
-### Available Prompts
+#### Query & Measurement (6)
+| Tool | Description |
+|------|-------------|
+| `query_entities` | Search by type/layer with limit |
+| `get_entity_properties` | Full properties by handle |
+| `measure_distance` | Distance between two points |
+| `measure_area` | Area & perimeter of closed entity |
+| `count_entities` | Count + breakdown by type/layer |
+| `get_drawing_extents` | Bounding box of all entities |
 
--   **`house_generator`**: Prompt template that guides the assistant to call `generate_house_plan`.
-        -   Optional args: `bedrooms`, `bathrooms`, `lot_width`, `lot_depth`, `style`, `requirements`, `output_path`.
-        -   Example defaults generate: `Casa de 3 dormitorios, 2 banos, lote 10x8, estilo linear`.
+#### Modify & Transform (9)
+| Tool | Description |
+|------|-------------|
+| `move_entities` | Translate by delta vector |
+| `rotate_entities` | Rotate around base point |
+| `scale_entities` | Scale from base point |
+| `copy_entities` | Duplicate with offset |
+| `mirror_entities` | Mirror across axis line |
+| `offset_entity` | Offset curve at distance |
+| `erase_entities` | Delete by handles |
+| `change_layer` | Move entities to layer |
+| `change_color` | Change ACI color |
 
-## Quick Example (Prompt -> House)
+#### Block Management (5)
+| Tool | Description |
+|------|-------------|
+| `insert_block` | Insert block by name/path |
+| `list_blocks` | List definitions in drawing |
+| `list_available_blocks` | List blocks from library |
+| `explode_block` | Explode into components |
+| `get_block_attributes` / `set_block_attribute` | Read/write attributes |
 
-From any MCP client that supports prompts:
-1. Request prompt list (`prompts/list`) and select `house_generator`.
-2. Request prompt content (`prompts/get`) with args, for example:
+#### Dimensions & Annotations (6)
+| Tool | Description |
+|------|-------------|
+| `add_linear_dimension` | H/V/auto dimension |
+| `add_aligned_dimension` | Aligned dimension |
+| `add_radial_dimension` | Radius dimension on circle/arc |
+| `create_leader` | Leader with text |
+| `create_table` | Table with data |
+| `update_text` | Modify existing text |
+
+#### Layer Management (5)
+| Tool | Description |
+|------|-------------|
+| `get_layers` | List all layers + properties |
+| `create_layer` | Create layer with color/weight |
+| `set_layer_properties` | Modify on/off/freeze/lock/color |
+| `delete_layer` | Remove layer |
+| `set_current_layer` | Set active layer |
+
+#### Document & Export (6)
+| Tool | Description |
+|------|-------------|
+| `save_drawing` | Save or Save As |
+| `zoom_extents` | Zoom to fit all entities |
+| `undo` | Undo N operations |
+| `run_command` | Raw command / LISP expression |
+| `export_to_pdf` | DWG → PDF (headless) |
+| `export_to_dxf` | DWG → DXF (headless) |
+
+#### Batch & Generation (3)
+| Tool | Description |
+|------|-------------|
+| `execute_script_file` | Run .scr on .dwg (headless) |
+| `list_available_scripts` | List .scr/.lsp in scripts dir |
+| `generate_house_plan` | NL → full floor plan DWG |
+
+### Prompts
+
+-   **`house_generator`** — Guides the assistant to call `generate_house_plan`.
+
+## Quick Example
 
 ```json
 {
-    "name": "house_generator",
-    "arguments": {
-        "bedrooms": "3",
-        "bathrooms": "2",
-        "lot_width": "12",
-        "lot_depth": "9",
-        "style": "open",
-        "requirements": "Incluye terraza trasera y cocina integrada"
-    }
+  "name": "house_generator",
+  "arguments": {
+    "bedrooms": "3",
+    "bathrooms": "2",
+    "lot_width": "12",
+    "lot_depth": "9",
+    "style": "open",
+    "requirements": "Incluye terraza trasera y cocina integrada"
+  }
 }
 ```
-
-3. Execute the returned instruction; it will call `generate_house_plan` with a ready payload.
 
 ## Configuration (.env)
 

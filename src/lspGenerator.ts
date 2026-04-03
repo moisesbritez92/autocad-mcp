@@ -186,58 +186,20 @@ function buildBlockInserts(doors: DoorSpec[], windows: WindowSpec[]): string {
     const bp = toDwgPath(d.blockPath);
     s += `  (insblk "${bp}" ${pt(d.x, d.y)} 1 1 ${n(d.rotation)})\n`;
   }
-  // Windows are drawn as inline LINE geometry (see buildWindowGeometry) — no block insert needed.
-  return s;
-}
 
-/**
- * Draw windows as plain AutoLISP LINE commands so orientation is always correct,
- * independent of the DWG block's own coordinate system.
- *
- * Symbol (plan view): two parallel lines along the wall opening + end caps,
- * positioned near the two wall faces.  The formula:
- *   face1 = cutLo + wallDepthCut + MARGIN   (inner/outer face depending on orientation)
- *   face2 = cutHi - wallDepthCut - MARGIN
- * where cutLo/Hi are the cut region bounds in the direction perpendicular to the wall,
- * and span1/span2 are the bounds parallel to the wall (= the opening width).
- */
-function buildWindowGeometry(windows: WindowSpec[]): string {
-  if (windows.length === 0) return "";
-  const MARGIN = 0.03; // inset from wall face so lines stay within the wall shell
-  let s = `\n  ;; ── Window geometry (inline lines, orientation-safe) ─────────────────\n`;
+  s += `\n  ;; ── Window block inserts ──────────────────────────────────────────────\n`;
   s += `  (setvar "CLAYER" "WINDOWS")\n`;
-
   for (const w of windows) {
-    const d = w.wallDepthCut;
-
-    if (w.facing === "N" || w.facing === "S") {
-      // Horizontal window: lines run along X, separation is in Y
-      const yFace1 = parseFloat((w.cutY1 + d + MARGIN).toFixed(4));
-      const yFace2 = parseFloat((w.cutY2 - d - MARGIN).toFixed(4));
-      const xL = w.cutX1;
-      const xR = w.cutX2;
-      // Two glass lines (parallel to wall)
-      s += `  (command "._LINE" ${pt(xL, yFace1)} ${pt(xR, yFace1)} "")\n`;
-      s += `  (command "._LINE" ${pt(xL, yFace2)} ${pt(xR, yFace2)} "")\n`;
-      // End caps (perpendicular, at each side of opening)
-      s += `  (command "._LINE" ${pt(xL, yFace1)} ${pt(xL, yFace2)} "")\n`;
-      s += `  (command "._LINE" ${pt(xR, yFace1)} ${pt(xR, yFace2)} "")\n`;
-    } else {
-      // Vertical window: lines run along Y, separation is in X
-      const xFace1 = parseFloat((w.cutX1 + d + MARGIN).toFixed(4));
-      const xFace2 = parseFloat((w.cutX2 - d - MARGIN).toFixed(4));
-      const yB = w.cutY1;
-      const yT = w.cutY2;
-      // Two glass lines (parallel to wall)
-      s += `  (command "._LINE" ${pt(xFace1, yB)} ${pt(xFace1, yT)} "")\n`;
-      s += `  (command "._LINE" ${pt(xFace2, yB)} ${pt(xFace2, yT)} "")\n`;
-      // End caps
-      s += `  (command "._LINE" ${pt(xFace1, yB)} ${pt(xFace2, yB)} "")\n`;
-      s += `  (command "._LINE" ${pt(xFace1, yT)} ${pt(xFace2, yT)} "")\n`;
-    }
+    const bp = toDwgPath(w.blockPath);
+    // Scale based on window width relative to 2m base block
+    const sx = parseFloat((w.width / 2.0).toFixed(3));
+    const sy = sx; // uniform scale
+    s += `  (insblk "${bp}" ${pt(w.x, w.y)} ${n(sx)} ${n(sy)} ${n(w.rotation)})\n`;
   }
   return s;
 }
+
+// Window geometry is now handled by block inserts in buildBlockInserts()
 
 function buildLabels(rooms: PlacedRoom[]): string {
   let s = `\n  ;; ── Room labels ───────────────────────────────────────────────────────\n`;
@@ -273,8 +235,15 @@ function buildSave(outputPath: string): string {
   const p = toDwgPath(outputPath);
   return `
   ;; ── Save drawing ───────────────────────────────────────────────────────
+  (setvar "FILEDIA" 0)
   (setq outpath "${p}")
-  (command "._SAVEAS" "2018" outpath)
+  (if (findfile outpath)
+    (progn
+      (command "._SAVEAS" "2018" outpath "_Y")
+    )
+    (command "._SAVEAS" "2018" outpath)
+  )
+  (setvar "FILEDIA" 1)
   (command "._ZOOM" "_E")
   (princ (strcat "\\nSaved: " outpath "\\n"))
   (princ)
@@ -287,10 +256,16 @@ function buildSave(outputPath: string): string {
 
 // ── Public API ─────────────────────────────────────────────────
 
+export interface GenerateLSPOptions {
+  /** Skip door/window openings and block inserts (walls-only mode) */
+  wallsOnly?: boolean;
+}
+
 /**
  * Generate the full AutoLISP script from a computed Layout.
  */
-export function generateLSP(layout: Layout, outputPath: string): string {
+export function generateLSP(layout: Layout, outputPath: string, opts?: GenerateLSPOptions): string {
+  const wallsOnly = opts?.wallsOnly ?? false;
   const sections: string[] = [
     buildHeader(),
     buildClear(),
@@ -298,13 +273,14 @@ export function generateLSP(layout: Layout, outputPath: string): string {
     buildFloor(layout),
     buildWallShell(layout),
     buildRoomVoids(layout.rooms),
-    buildOpenings(layout.doors, layout.windows),
-    buildBlockInserts(layout.doors, layout.windows),
-    buildWindowGeometry(layout.windows),
-    buildLabels(layout.rooms),
-    buildDimensions(layout),
-    buildSave(outputPath),
   ];
+  if (!wallsOnly) {
+    sections.push(buildOpenings(layout.doors, layout.windows));
+    sections.push(buildBlockInserts(layout.doors, layout.windows));
+  }
+  sections.push(buildLabels(layout.rooms));
+  sections.push(buildDimensions(layout));
+  sections.push(buildSave(outputPath));
   return sections.join("");
 }
 

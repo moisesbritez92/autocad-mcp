@@ -1,422 +1,366 @@
-# Architectural Design Rules for AI CAD Agents
-
-This document defines architectural heuristics and validation rules that allow an AI agent connected to CAD tools (AutoCAD / DXF / BIM pipelines) to generate and evaluate residential floorplans with professional architectural quality.
-
-The goal is to transform CAD interpretation from pure geometry into **architectural reasoning**.
+# 🚀 VERSIÓN MEJORADA — Architectural Design Rules for AI CAD Agents (v2.0)
 
 ---
 
-# 1. Architectural Layout Principles
+# 0. Global Design Constraints
 
-## Separation of Public and Private Zones
+Antes de cualquier layout, el agente debe validar:
 
-Residential architecture usually separates spaces into two categories:
-
-**Social zone**
-- Living room
-- Dining
-- Kitchen
-
-**Private zone**
-- Bedrooms
-- Bathroom
-
-Rule:
-
-```
-
-bedrooms should not open directly into the living room
-
-```
-
-Prefer:
-
-- hallway
-- distribution space
-- small foyer
-
----
-
-## Open Space Concept
-
-Modern housing often integrates living and kitchen spaces.
-
-Instead of:
-
-```
-
-Living | Kitchen
-
-```
-
-Prefer:
-
-```
-
-Living + Kitchen
-
-```
-
-Benefits:
-
-- larger perceived space
-- improved lighting
-- better circulation
-
----
-
-## Circulation Efficiency
-
-Corridors waste usable area.
-
-Rule:
-
-```
-
-corridor_area < 10% total_floor_area
-
-```
-
-Prefer:
-
-- central living circulation
-- minimal hallway
-- shared access points
-
----
-
-# 2. Room Proportions
-
-Rooms should have balanced proportions.
-
-Recommended aspect ratio:
-
-```
-
-1 : 1.2   to   1 : 1.8
-
-```
-
-Example (good):
-
-```
-
-3.5 x 4.5
-
-```
-
-Example (bad):
-
-```
-
-2 x 6
-
-```
-
-Rule:
-
-```
-
-room_aspect_ratio <= 2
-
-```
-
----
-
-# 3. Natural Lighting Rules
-
-Habitable rooms must have windows.
-
-Rule:
-
-```
-
-window_area >= 10% room_area
-
-```
-
-Example:
-
-```
-
-Room: 12 m²
-Minimum window area: 1.2 m²
-
-```
-
-Exceptions:
-
-- bathrooms
-- storage
-- closets
-
----
-
-# 4. Door Placement Rules
-
-Doors must not interfere with circulation.
-
-Avoid:
-
-- doors colliding
-- doors opening into narrow spaces
-- doors blocking pathways
-
-Rule:
-
-```
-
-door_clearance >= 60cm
-
-```
-
----
-
-# 5. Wet Core Grouping
-
-Bathrooms, kitchens and laundry rooms should be grouped to reduce plumbing complexity.
-
-Rule:
-
-```
-
-distance(bathroom, kitchen) < 4m
-
-```
-
-Benefits:
-
-- lower construction cost
-- simpler piping
-- maintenance efficiency
-
----
-
-# 6. Window Hierarchy
-
-The living room should receive the best natural lighting.
-
-Rule:
-
-```
-
-largest_window -> living_room
-
-```
-
----
-
-# 7. Bedroom Hierarchy
-
-Master bedroom should be larger.
-
-Rule:
-
-```
-
-master_bedroom_area >= other_bedrooms
-
-```
-
-Typical values:
-
-| Room | Area |
-|-----|------|
-Master bedroom | 11–14 m² |
-Secondary bedroom | 8–10 m² |
-
----
-
-# 8. Avoid Residual Spaces
-
-Architectural layouts should minimize unusable geometry.
-
-Avoid:
-
-- triangular leftover spaces
-- dead corners
-- awkward geometry
-
-Rule:
-
-```
-
+```python
+total_floor_area > 40 m²
 usable_area_ratio > 0.85
-
+natural_light_coverage > 70% habitable rooms
 ```
 
 ---
 
-# 9. Structural Alignment
+# 1. Zoning Intelligence (Enhanced)
 
-Walls should align across axes.
+## Functional Zoning Graph
 
-Avoid:
+El layout debe seguir un grafo lógico:
 
+```text
+Entrance → (Foyer) → Living → (Kitchen / Dining)
+                      ↓
+                  Distribution
+                      ↓
+          Bedrooms + Bathroom
 ```
 
-misaligned walls
+### Nueva regla:
 
+```python
+private_zone_visibility_from_entrance = LOW
 ```
 
-Prefer:
+✔️ Evitar que desde la puerta se vea:
 
-```
-
-aligned walls
-
-```
-
-Rule:
-
-```
-
-walls should align across axes
-
-```
-
-Benefits:
-
-- structural clarity
-- easier construction
-- better aesthetics
+* camas
+* baño
+* zonas íntimas
 
 ---
 
-# 10. Wall Thickness Standards
+# 2. Circulation Model (Advanced)
 
-Typical values:
+En vez de solo minimizar pasillos:
 
-| Wall Type | Thickness |
-|-----------|-----------|
-Exterior wall | 25–30 cm |
-Interior wall | 10–15 cm |
+## Introducir “Flow Graph”
 
----
-
-# 11. Functional Space Distribution
-
-Typical distribution in small houses:
-
+```python
+circulation_efficiency = shortest_path_sum / ideal_path_sum
 ```
 
-Living + Kitchen   30 m²
-Bedroom 1          12 m²
-Bedroom 2          10 m²
-Bathroom            4 m²
-Circulation + storage 6 m²
+Regla:
 
+```python
+circulation_efficiency >= 0.85
 ```
 
 ---
 
-# 12. Entry Transition (Foyer)
+## Evitar “dead paths”
 
-Professional layouts rarely open directly into the living space.
-
-Prefer:
-
-```
-
-Entrance
-↓
-+-------+
-| Hall  |
-+---+---+
-|
-Living
-
-```
-
-Benefits:
-
-- privacy
-- spatial transition
-- better circulation control
-
----
-
-# 13. Storage Integration
-
-Modern residential plans include:
-
-- built-in closets
-- laundry area
-- storage niches
-
-Example:
-
-```
-
-Bedroom
-+-----------+
-|           |
-| Closet    |
-|           |
-+-----------+
-
+```python
+no_space_should_require_backtracking
 ```
 
 ---
 
-# 14. Indoor-Outdoor Connection
+# 3. Space Hierarchy (Arquitectura real)
 
-Architectural designs often connect interior spaces with exterior spaces.
+## Jerarquía espacial obligatoria:
 
-Example:
-
+```text
+Public > Semi-private > Private
 ```
 
-+-----------------------+
-| Living + Kitchen      |
-|            +----------|
-|            | Terrace  |
-+------------+----------+
+### Regla nueva:
 
+```python
+space_importance_rank(living) > bedrooms > bathroom
 ```
-
-Benefits:
-
-- improved lighting
-- spatial expansion
-- lifestyle quality
 
 ---
 
-# 15. Bathroom Placement Strategy
+# 4. Proportions (Refined)
 
-Bathrooms should ideally be placed near the center or grouped with plumbing systems.
+Agregar **área mínima funcional real**:
 
-Prefer:
-
+```python
+living_area >= 18 m²
+kitchen_area >= 6 m²
+bedroom_area >= 8 m²
+bathroom_area >= 3.5 m²
 ```
-
-Bedroom | Bathroom | Bedroom
-
-````
-
-Avoid:
-
-- isolated bathrooms
-- bathrooms in prime façade positions
 
 ---
 
-# 16. Architectural Quality Score
+## Nueva métrica: Compacidad
 
-The agent can compute a design quality metric.
+```python
+compactness = area / perimeter²
+```
 
-Example structure:
+Regla:
+
+```python
+compactness >= 0.05
+```
+
+👉 Evita formas raras o caras de construir
+
+---
+
+# 5. Natural Light Optimization (Pro level)
+
+No solo ventanas:
+
+## Introducir orientación
+
+```python
+living_room_orientation ∈ [South, South-East, South-West]
+```
+
+(si no hay orientación real, usar heurística de fachada principal)
+
+---
+
+## Profundidad de iluminación
+
+```python
+max_distance_to_window <= 2.5 * window_height
+```
+
+---
+
+# 6. Ventilation Logic (Nuevo 🔥)
+
+```python
+cross_ventilation = True for main spaces
+```
+
+Regla:
+
+```python
+at_least_two_opposite_openings(living or bedrooms)
+```
+
+---
+
+# 7. Door Intelligence
+
+Agregar lógica real:
+
+```python
+door_swing_collision = False
+door_to_wall_distance >= 10 cm
+```
+
+---
+
+## Regla premium:
+
+```python
+main_paths_width >= 90 cm
+secondary_paths_width >= 70 cm
+```
+
+---
+
+# 8. Wet Core Optimization (Advanced)
+
+No solo distancia:
+
+```python
+wet_core_clustered = True
+vertical_alignment_if_multifloor = True
+```
+
+---
+
+## Nueva regla:
+
+```python
+bathroom_adjacent_to_bedroom_or_hall = True
+```
+
+---
+
+# 9. Structural Logic (Ingeniería + Arquitectura)
+
+Agregar grid estructural:
+
+```python
+grid_spacing ∈ [3m, 5m]
+```
+
+Regla:
+
+```python
+load_bearing_walls_aligned = True
+```
+
+---
+
+# 10. Furniture Feasibility (MUY IMPORTANTE 🔥)
+
+Aquí es donde la mayoría de IA falla.
+
+## Validar que los muebles caben:
+
+Ejemplo dormitorio:
+
+```python
+bed (2.0 x 1.6) + circulation >= 60 cm
+```
+
+Regla:
+
+```python
+furniture_fit_score >= 0.9
+```
+
+---
+
+## Living room:
+
+Debe permitir:
+
+* sofá
+* mesa
+* TV
+
+---
+
+# 11. Storage Intelligence
+
+```python
+storage_area >= 5% total_floor_area
+```
+
+---
+
+# 12. Entry Experience (Arquitectura real)
+
+No solo foyer:
+
+## Secuencia espacial:
+
+```text
+Compression → Expansion
+```
+
+Ejemplo:
+
+```text
+Entrada pequeña → Living amplio
+```
+
+Regla:
+
+```python
+entry_transition_quality >= 0.7
+```
+
+---
+
+# 13. Indoor-Outdoor Integration (Enhanced)
+
+```python
+living_room_connected_to_outdoor = True
+```
+
+---
+
+## Nueva métrica:
+
+```python
+outdoor_accessibility_score >= 0.6
+```
+
+---
+
+# 14. Bathroom Intelligence
+
+Agregar ergonomía real:
+
+```python
+toilet_clearance_front >= 60 cm
+sink_clearance >= 50 cm
+shower_min_size = 80 x 80 cm
+```
+
+---
+
+# 15. Acoustic Separation (Nuevo 🔥)
+
+```python
+bathroom_should_not_share_wall_with_living (preferred)
+```
+
+```python
+bedrooms_should_not_border_noisy_zones
+```
+
+---
+
+# 16. Privacy Gradient
+
+```python
+privacy_gradient = entrance → living → bedrooms
+```
+
+Regla:
+
+```python
+no_direct_line_of_sight(entrance, bedroom)
+```
+
+---
+
+# 17. AI Validation Metrics (Mucho más potente)
 
 ```json
 {
-  "design_score": 0.82,
-  "lighting_score": 0.78,
-  "circulation_score": 0.85,
-  "space_efficiency": 0.88,
-  "room_proportions": 0.80
+  "design_score": 0.0,
+  "zoning_score": 0.0,
+  "circulation_score": 0.0,
+  "lighting_score": 0.0,
+  "ventilation_score": 0.0,
+  "furniture_fit_score": 0.0,
+  "privacy_score": 0.0,
+  "efficiency_score": 0.0,
+  "structural_score": 0.0
 }
-````
+```
+
+---
+
+# 18. Penalization Rules (Clave para IA)
+
+Esto es lo que hace que tu sistema sea realmente bueno:
+
+```python
+penalty += 0.2 if bedroom_opens_to_living
+penalty += 0.1 if corridor_area > 15%
+penalty += 0.15 if no_cross_ventilation
+penalty += 0.2 if furniture_not_fit
+penalty += 0.1 if poor_lighting
+```
+
+---
+
+🔥 Nuevos pilares:
+
+* circulación como grafo
+* validación de muebles (clave)
+* ventilación cruzada
+* orientación solar
+* privacidad real
+* ergonomía
+* penalizaciones cuantificables
 
 ---
 
